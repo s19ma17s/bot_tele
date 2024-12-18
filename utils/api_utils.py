@@ -1,15 +1,14 @@
-# bot_tele/utils/api_utils.py
-
+# your_bot/utils/api_utils.py
 import logging
 import base64
 import io
 import httpx
-from bot_tele.config import FLASK_API_ENDPOINT
+from config import FLASK_API_ENDPOINT
 
 logger = logging.getLogger(__name__)
 
 
-async def send_data_to_api(data, uploaded_file):
+async def send_data_to_api(data, uploaded_file, update):
     try:
         files = {}
         if uploaded_file:
@@ -19,13 +18,13 @@ async def send_data_to_api(data, uploaded_file):
         async with httpx.AsyncClient() as client:
             response = await client.post(FLASK_API_ENDPOINT, data=data, files=files, timeout=10)
             response.raise_for_status()
-            logger.info(f"Data sent to API successfully. Response: {response.status_code}")
+            logger.info(f"تم إرسال البيانات إلى واجهة برمجة التطبيقات بنجاح. الرد: {response.status_code}")
             if response.headers.get("Content-Type") == "application/json":
-                return response.json().get("message")  # Return the message correctly
-            return None # Return None if there is no message
+                return response.json().get("message")  # إرجاع الرسالة بشكل صحيح
+            return None # إرجاع None إذا لم تكن هناك رسالة
     except httpx.HTTPError as e:
-        logger.error(f"Failed to send data to API. HTTP Error: {e}", exc_info=True)
-        return f"Failed to send data to API. HTTP Error: {e}"
+        logger.error(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. خطأ HTTP: {e}", exc_info=True)
+        return f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. خطأ HTTP: {e}"
     except Exception as e:
-        logger.error(f"Failed to send data to API. Error: {e}", exc_info=True)
-        return f"Failed to send data to API. Error: {e}"
+        logger.error(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. حدث خطأ: {e}", exc_info=True)
+        return f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. حدث خطأ: {e}"

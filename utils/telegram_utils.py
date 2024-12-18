@@ -1,75 +1,26 @@
-# bot_tele/utils/telegram_utils.py
+# your_bot/utils/telegram_utils.py
 import logging
 import mimetypes
 import os
 import base64
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update
 from telegram.ext import ContextTypes
-from bot_tele.constants import get_system_instructions
+from constants import get_system_instructions
 import io
-import datetime
-import sqlite3
-import httpx
-from mega import Mega
-from bot_tele.config import MEGA_USER, MEGA_PASSWORD, MEGA_FOLDER_NAME
+
 logger = logging.getLogger(__name__)
 
-# Initialize Mega client
-mega = Mega()
-m = mega.login(MEGA_USER, MEGA_PASSWORD)
-
-# Create the Mega folder if it doesn't exist
-try:
-    mega_folder = m.find(MEGA_FOLDER_NAME)[0]
-except IndexError:
-    mega_folder = m.create_folder(MEGA_FOLDER_NAME)
-
-
-# Determine the directory of the current script
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# Construct the path to the uploaded_files directory and database file
-FILES_DIR = os.path.join(os.path.dirname(current_dir), "uploaded_files")
-DB_FILE = os.path.join(FILES_DIR, "files.db")
-
-# Function to connect to the database
-def get_db_connection():
-    conn = sqlite3.connect(DB_FILE)
-    return conn
-
-# Function to create tables if they dont exist
-def setup_database():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS files (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            original_name TEXT,
-            stored_name TEXT,
-            user_id INTEGER,
-            user_name TEXT,
-            mime_type TEXT,
-            timestamp TEXT,
-            book_name TEXT,
-            book_grade TEXT,
-            mega_url TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-# setup database at start
-setup_database()
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> dict:
-    # Get the largest available photo size
+    # الحصول على أكبر حجم صورة متاح
     try:
        photos = update.message.photo
-       photo = photos[-1]  # Use the last (largest) photo
+       photo = photos[-1]  # استخدام آخر (أكبر) صورة
        
        file = await photo.get_file()
        file_data = await file.download_as_bytearray()
        
        file_path = io.BytesIO(file_data)
-       mime_type = "image/png"  # Photos sent from Telegram are usually png
+       mime_type = "image/png"  # الصور المرسلة من التليجرام تكون png غالبًا
        file_base64 = base64.b64encode(file_data).decode("utf-8")
        
        uploaded_file = {
@@ -79,123 +30,41 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> di
        
        return uploaded_file
     except Exception as e:
-        logger.error(f"Error processing photo: {e}", exc_info=True)
-        await update.message.reply_text("Error processing the photo. Please try again later.")
+        logger.error(f"حدث خطأ في معالجة الصورة: {e}", exc_info=True)
+        await update.message.reply_text("خطأ في معالجة الصورة. يرجى المحاولة مرة أخرى لاحقًا.")
         return None
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> dict:
     try:
-        file = await update.message.document.get_file()
-        file_data = await file.download_as_bytearray()
+       file = await update.message.document.get_file()
+       file_data = await file.download_as_bytearray()
 
-        file_path = file.file_path
-        mime_type, _ = mimetypes.guess_type(file_path)
-        
-        # Extract the file name from file_path
-        file_name = os.path.basename(file_path)
-        
-        file_base64 = base64.b64encode(file_data).decode("utf-8")
+       file_path = file.file_path
+       mime_type, _ = mimetypes.guess_type(file_path)
+       
+       # استخراج اسم الملف من file_path
+       file_name = os.path.basename(file_path)
+       
+       file_base64 = base64.b64encode(file_data).decode("utf-8")
 
-        # Create the file's path
-        os.makedirs(FILES_DIR, exist_ok=True)
-        
-        user = update.message.from_user
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        new_file_name = f"{user.id}_{timestamp}_{file_name}"
-        new_file_path = os.path.join(FILES_DIR, new_file_name)
-        
-        if context.user_data.get("save_file"):
-            del context.user_data["save_file"]
-            # Ask the user for book info
-            context.user_data["pending_file"] = {
-                "original_name": file_name,
-                "stored_name": new_file_name,
-                "user_id": user.id,
-                "user_name": user.first_name,
-                "mime_type": mime_type,
-                "timestamp": timestamp,
-                "file_base64": file_base64,
-                "file_data": file_data
-            }
+       uploaded_file = {
+           "mimeType": mime_type,
+           "data": file_base64,
+           "file_name": file_name
+       }
 
-            reply_keyboard = [['الغاء']]
-            markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
-
-            await update.message.reply_text(
-                "يرجى إدخال اسم الكتاب والفرقة الدراسية (مثال: كتاب المدني للفرقة الرابعة)",
-                reply_markup=markup
-            )
-        
-            return None
-        else:
-            # Upload file to Mega and get the URL
-            
-            mega_file = m.upload(new_file_path, dest=mega_folder)
-            mega_url = m.get_upload_link(mega_file)
-
-            uploaded_file = {
-                "mimeType": mime_type,
-                "data": file_base64,
-                "file_name": file_name,
-                "mega_url": mega_url,
-            }
-            return uploaded_file
+       return uploaded_file
     except Exception as e:
-        logger.error(f"Error processing file: {e}", exc_info=True)
-        await update.message.reply_text("Error processing the file. Please try again later.")
-        return None
-        
-
-async def save_book_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    book_info = update.message.text
-    if book_info == "الغاء":
-       del context.user_data["pending_file"]
-       await update.message.reply_text("تم الغاء عملية الحفظ.", reply_markup=ReplyKeyboardRemove())
+       logger.error(f"حدث خطأ في معالجة الملف: {e}", exc_info=True)
+       await update.message.reply_text("خطأ في معالجة الملف. يرجى المحاولة مرة أخرى لاحقًا.")
        return None
-    try:
-        pending_file = context.user_data.get("pending_file")
-
-        if pending_file:
-            
-            
-            mega_file = m.upload(os.path.join(FILES_DIR, pending_file['stored_name']), dest=mega_folder)
-            mega_url = m.get_upload_link(mega_file)
-            book_name = None
-            book_grade = None
-            if "كتاب" in book_info:
-                book_name_start = book_info.find("كتاب") + len("كتاب")
-                book_name_end = book_info.find("للفرقة")
-                if book_name_end == -1:
-                    book_name = book_info[book_name_start:].strip()
-                else:
-                    book_name = book_info[book_name_start:book_name_end].strip()
-                if "للفرقة" in book_info:
-                    book_grade_start = book_info.find("للفرقة") + len("للفرقة")
-                    book_grade = book_info[book_grade_start:].strip()
-            
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO files (original_name, stored_name, user_id, user_name, mime_type, timestamp, book_name, book_grade, mega_url)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (pending_file["original_name"], pending_file["stored_name"], pending_file["user_id"], pending_file["user_name"], pending_file["mime_type"], pending_file["timestamp"], book_name, book_grade, mega_url))
-            conn.commit()
-            conn.close()
-            del context.user_data["pending_file"]
-            await update.message.reply_text("تم حفظ الملف بنجاح!",reply_markup=ReplyKeyboardRemove())
-        else:
-            await update.message.reply_text("حدث خطأ. حاول مره اخري",reply_markup=ReplyKeyboardRemove())
-    except Exception as e:
-         logger.error(f"Error while saving file info: {e}", exc_info=True)
-         await update.message.reply_text("حدث خطأ اثناء حفظ معلومات الملف",reply_markup=ReplyKeyboardRemove())
-
-
-async def get_or_create_chat_session(update: Update, context: ContextTypes.DEFAULT_TYPE, model):
+    
+async def get_or_create_chat_session(update: Update, context: ContextTypes.DEFAULT_TYPE, model=None):
     chat_id = update.message.chat.id
     if update.message.chat.type != "private":
         chat_data = context.chat_data.get(chat_id)
         if not chat_data:
-            # Add system instructions as part of initial conversation history
+             # إضافة تعليمات النظام كجزء من سجل المحادثة الأولي
             chat_session = model.start_chat(history=[{"parts": [{"text": get_system_instructions()}], "role": "user"}])
             context.chat_data[chat_id] = {
                 "chat_session": chat_session,
@@ -206,14 +75,14 @@ async def get_or_create_chat_session(update: Update, context: ContextTypes.DEFAU
     else:
         chat_session = context.user_data.get('chat_session')
         if not chat_session:
-            # Add system instructions as part of initial conversation history
+             # إضافة تعليمات النظام كجزء من سجل المحادثة الأولي
             chat_session = model.start_chat(history=[{"parts": [{"text": get_system_instructions()}], "role": "user"}])
             context.user_data['chat_session'] = chat_session
         
         return chat_session
 
 async def send_long_message(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
-    """Split and send long messages."""
+    """تقسيم وإرسال الرسائل الطويلة."""
     max_length = 4096
     for i in range(0, len(text), max_length):
         chunk = text[i:i + max_length]

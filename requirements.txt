@@ -1,9 +1,6 @@
+python-dotenv
 python-telegram-bot
 google-generativeai
-python-dotenv
-flask
 httpx
+flask
 pillow
-boto3
-gunicorn
-mega.py
