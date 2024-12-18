@@ -108,7 +108,7 @@ def receive_telegram_data():
 
 
 def run_flask_app():
-    app.run(debug=True, use_reloader=False) # استخدام use_reloader=False لمنع التعارض
+    app.run(debug=True, use_reloader=False, host='0.0.0.0') # استخدام use_reloader=False لمنع التعارض وتغيير host إلى 0.0.0.0
 
 # --- كود بوت تيليجرام ---
 
@@ -273,8 +273,12 @@ async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE, us
         user = update.message.from_user
 
         # إرسال إجراء الكتابة دائمًا قبل المعالجة
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-
+        try:
+             await asyncio.wait_for(context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING), timeout=10) # استخدام wait_for مع مهلة زمنية
+        except asyncio.TimeoutError:
+            logger.error(f"تجاوزت المهلة الزمنية أثناء محاولة إرسال send_chat_action", exc_info=True)
+             # يمكنك هنا اختيار إرسال رسالة للمستخدم تخبره بوجود مشكلة أو محاولة إرسال الإجراء مرة أخرى
+        
         parts = []
         if user_input:
             parts.append({"text": user_input})
@@ -301,12 +305,12 @@ async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE, us
             "formatted_message": formatted_message
         }
 
-         # إرسال البيانات إلى واجهة برمجة التطبيقات والحصول على الرد
+        # إرسال البيانات إلى واجهة برمجة التطبيقات والحصول على الرد
         api_response = await send_data_to_api(api_data, uploaded_file, update)
 
         # تعليق: إذا كان هناك رد من واجهة برمجة التطبيقات، قم بمعالجته أولًا
         if api_response:
-            await update.message.reply_text(api_response)
+           await update.message.reply_text(api_response)
         
         if parts:
            response = chat_session.send_message({"parts": parts})
@@ -331,6 +335,7 @@ async def send_data_to_api(data, uploaded_file, update):
              files["file"] = (uploaded_file.get("file_name", "file"), io.BytesIO(file_data), uploaded_file["mimeType"])
         
         async with httpx.AsyncClient() as client:
+            # زيادة المهلة الزمنية هنا إلى 30 ثانية
             response = await client.post('http://127.0.0.1:5000/your-api-endpoint', data=data, files=files, timeout=30)
             response.raise_for_status()
             logger.info(f"تم إرسال البيانات إلى واجهة برمجة التطبيقات بنجاح. الرد: {response.status_code}")
@@ -339,11 +344,10 @@ async def send_data_to_api(data, uploaded_file, update):
             return None # إرجاع None إذا لم تكن هناك رسالة
     except httpx.HTTPError as e:
         logger.error(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. خطأ HTTP: {e}", exc_info=True)
-        return f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. خطأ HTTP: {e}"
+        return None # إرجاع None بدلاً من رسالة الخطأ
     except Exception as e:
         logger.error(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. حدث خطأ: {e}", exc_info=True)
-        return f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. حدث خطأ: {e}"
-
+        return None # إرجاع None بدلاً من رسالة الخطأ
 
 def main() -> None:
     # بدء Flask في مؤشر ترابط منفصل
