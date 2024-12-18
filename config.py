@@ -1,4 +1,4 @@
-# my_bot/config.py
+# your_bot/config.py
 import os
 from dotenv import load_dotenv
 
