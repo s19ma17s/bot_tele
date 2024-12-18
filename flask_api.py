@@ -23,7 +23,7 @@ def your_api_endpoint():
         return jsonify({"status": "error", "message": f"Error: {e}"}), 500
 
 def run_flask_app():
-    app.run(host="0.0.0.0", port=8000, debug=False, use_reloader=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
 
 
 if __name__ == "__main__":
