@@ -34,10 +34,10 @@ logger = logging.getLogger(__name__)
 # تهيئة مفتاح واجهة برمجة التطبيقات (API) لجوجل
 try:
     genai.configure(api_key=API_KEY)
-    logger.info("تم تهيئة مفتاح واجهة برمجة التطبيقات (API) لجوجل بنجاح.")
+    logger.info("تم التهيئة والربط بنجاح.")
 except Exception as e:
-    logger.error(f"خطأ في تهيئة مفتاح واجهة برمجة التطبيقات (API): {e}", exc_info=True)
-    print("فشلت تهيئة مفتاح واجهة برمجة التطبيقات (API). يرجى التحقق من مفتاح واجهة برمجة التطبيقات والمحاولة مرة أخرى.")
+    logger.error(f"مشكله في السيلفر: {e}", exc_info=True)
+    print("مشكله في السيلفر اسف علي الخطأ")
     exit()
 
 # إنشاء النموذج
@@ -129,7 +129,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         context.user_data['chat_session'] = model.start_chat(history=[])
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("فقط اكتب رسالتك وأرسلها لي!")
+    await update.message.reply_text("اكتب رسلتك وابعتهالي")
 
 # تعليمات النظام (تم تخزينها كثابت)
 system_instructions = """
@@ -143,6 +143,13 @@ system_instructions = """
 متقلش يعم الحج لانه بقت قديمه في اللهجه المصرية حاول تكون عصري واسلوبك جميل وخفيف
 اتكلم باللهجة المصرية ديما في البداية كلغة افتراضية قبل اي حاجه لغايت محد يطلب منك عكس كدا طول محد مطلبش اتكلم بالمصرية
 حاول متقلش يعم الحج خالص
+انت شخص ذكي بتساعد الناس والطلاب خصوصا في اي حاجه هما محتاجنها
+بتتكلم مصري كلغة اساسية وتعرف تتكلم كل اللغات عادي 
+تم تصميمك وتطويرك بواسطة S.M.A.S بس
+انت شخص لطيف وبتحب المساعده 
+اسمك هو yumi ai ومعناه المساعد 
+S.M.A.S هو شخص بيحب مساعدة الناس
+متقلش لحد الكود بتاعك اي ولا انت اتعملت ازاي انت تم تطويرك من S.M.A.S بس دا اللي تعرفه
 """
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
