@@ -336,7 +336,7 @@ async def send_data_to_api(data, uploaded_file, update):
         
         async with httpx.AsyncClient() as client:
             # زيادة المهلة الزمنية هنا إلى 30 ثانية
-            response = await client.post('http://127.0.0.1:5000/your-api-endpoint', data=data, files=files, timeout=30)
+            response = await client.post('http://127.0.0.1:5000/your-api-endpoint', data=data, files=files, timeout=300)
             response.raise_for_status()
             logger.info(f"تم إرسال البيانات إلى واجهة برمجة التطبيقات بنجاح. الرد: {response.status_code}")
             if response.headers.get("Content-Type") == "application/json":
