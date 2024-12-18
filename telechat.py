@@ -331,7 +331,7 @@ async def send_data_to_api(data, uploaded_file, update):
              files["file"] = (uploaded_file.get("file_name", "file"), io.BytesIO(file_data), uploaded_file["mimeType"])
         
         async with httpx.AsyncClient() as client:
-            response = await client.post('http://127.0.0.1:5000/your-api-endpoint', data=data, files=files, timeout=10)
+            response = await client.post('http://127.0.0.1:5000/your-api-endpoint', data=data, files=files, timeout=30)
             response.raise_for_status()
             logger.info(f"تم إرسال البيانات إلى واجهة برمجة التطبيقات بنجاح. الرد: {response.status_code}")
             if response.headers.get("Content-Type") == "application/json":
