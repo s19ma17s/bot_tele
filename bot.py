@@ -103,22 +103,20 @@ def receive_telegram_data():
 
 
 def run_flask_app():
-    app.run(debug=True, use_reloader=False) # Use use_reloader=False to prevent conflict
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), use_reloader=False) # Use use_reloader=False to prevent conflict
 
-def main() -> None:
-    # Start Flask in a separate thread
-    flask_thread = Thread(target=run_flask_app)
-    flask_thread.daemon = True
-    flask_thread.start()
+if __name__ == '__main__':
+   # Start Flask in a separate thread
+   flask_thread = Thread(target=run_flask_app)
+   flask_thread.daemon = True
+   flask_thread.start()
 
-    application = Application.builder().token(BOT_TOKEN).build()
+   application = Application.builder().token(BOT_TOKEN).build()
 
-    application.add_handler(CommandHandler("start", commands.start))
-    application.add_handler(CommandHandler("help", commands.help_command))
-    application.add_handler(CommandHandler("save", commands.save_command))
-    application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL | filters.PHOTO | filters.REPLY, lambda update, context: message_handler.handle_message(update, context, model)))
+   application.add_handler(CommandHandler("start", commands.start))
+   application.add_handler(CommandHandler("help", commands.help_command))
+   application.add_handler(CommandHandler("save", commands.save_command))
+   application.add_handler(CommandHandler("search", commands.search_command))
+   application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL | filters.PHOTO | filters.REPLY, lambda update, context: message_handler.handle_message(update, context, model)))
 
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-if __name__ == "__main__":
-    main()
+   application.run_polling(allowed_updates=Update.ALL_TYPES)

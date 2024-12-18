@@ -15,7 +15,7 @@ import httpx
 import os
 import sqlite3
 logger = logging.getLogger(__name__)
-DB_FILE = os.path.join("bot_tele","uploaded_files","files.db")  # ملف قاعدة البيانات
+DB_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploaded_files", "files.db")  # ملف قاعدة البيانات
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, model) -> None:
     user = update.message.from_user
@@ -112,8 +112,16 @@ async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE, mo
             elif "ممكن الملفات اللي حملتها" in gemini_response:
                 file_info = load_file_info(user.id)
                 if file_info:
-                    await update.message.reply_text("هذه هي الملفات التي قمت بتحميلها:")
-                    for file in file_info:
+                   await update.message.reply_text("هذه هي الملفات التي قمت بتحميلها:")
+                   for file in file_info:
+                         # Use the mega_url from the database if it is present
+                        if file.get("mega_url"):
+                            file_url = file["mega_url"]
+                            async with httpx.AsyncClient() as client:
+                                response = await client.get(file_url)
+                                response.raise_for_status()
+                                await update.message.reply_document(document=response.content, filename=file["original_name"])
+                        else:
                             file_name = file["stored_name"]
                             file_url = f'http://127.0.0.1:5000/get_file?file_name={file_name}'
                             async with httpx.AsyncClient() as client:
@@ -133,26 +141,34 @@ async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE, mo
                 found_files = load_file_info()
                 found_files_filtered = []
                 if found_files:
-                    for file in found_files:
+                     for file in found_files:
                         if (file["book_name"] and book_name.lower() in file["book_name"].lower()) and (file["book_grade"] and book_grade.lower() in file["book_grade"].lower()):
-                            found_files_filtered.append(file)
+                           found_files_filtered.append(file)
 
                 if found_files_filtered:
                     await update.message.reply_text("هذه هي الكتب التي وجدتها:")
                     for file in found_files_filtered:
-                        file_name = file["stored_name"]
-                        file_url = f'http://127.0.0.1:5000/get_file?file_name={file_name}'
-                        async with httpx.AsyncClient() as client:
-                            response = await client.get(file_url)
-                            response.raise_for_status()
-                            await update.message.reply_document(document=response.content, filename=file["original_name"])
+                        # Use the mega_url from the database if it is present
+                        if file.get("mega_url"):
+                            file_url = file["mega_url"]
+                            async with httpx.AsyncClient() as client:
+                                response = await client.get(file_url)
+                                response.raise_for_status()
+                                await update.message.reply_document(document=response.content, filename=file["original_name"])
+                        else:
+                            file_name = file["stored_name"]
+                            file_url = f'http://127.0.0.1:5000/get_file?file_name={file_name}'
+                            async with httpx.AsyncClient() as client:
+                                response = await client.get(file_url)
+                                response.raise_for_status()
+                                await update.message.reply_document(document=response.content, filename=file["original_name"])
                 else:
                     await update.message.reply_text("لم أجد أي كتب تطابق بحثك.")
             elif api_response:
                 await update.message.reply_text(api_response)
             
             else:
-                 await send_long_message(update, context, gemini_response)
+                await send_long_message(update, context, gemini_response)
 
 
         except Exception as e:
@@ -172,17 +188,18 @@ def load_file_info(user_id=None):
     file_info = []
     if files_data:
         for row in files_data:
-            file_info.append({
-                "id": row[0],
-                "original_name": row[1],
-                "stored_name": row[2],
-                "user_id": row[3],
-                "user_name": row[4],
-                "mime_type": row[5],
-                "timestamp": row[6],
-                "book_name": row[7],
-                "book_grade": row[8]
-            })
+           file_info.append({
+               "id": row[0],
+               "original_name": row[1],
+               "stored_name": row[2],
+               "user_id": row[3],
+               "user_name": row[4],
+               "mime_type": row[5],
+               "timestamp": row[6],
+               "book_name": row[7],
+               "book_grade": row[8],
+                "mega_url": row[9]
+           })
 
     return file_info
 def get_db_connection():

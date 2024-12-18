@@ -10,10 +10,26 @@ import io
 import datetime
 import sqlite3
 import httpx
-
+from mega import Mega
+from bot_tele.config import MEGA_USER, MEGA_PASSWORD, MEGA_FOLDER_NAME
 logger = logging.getLogger(__name__)
-FILES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploaded_files")  # المجلد لتخزين الملفات المرفوعة
-DB_FILE = os.path.join(FILES_DIR, "files.db")  # ملف قاعدة البيانات
+
+# Initialize Mega client
+mega = Mega()
+m = mega.login(MEGA_USER, MEGA_PASSWORD)
+
+# Create the Mega folder if it doesn't exist
+try:
+    mega_folder = m.find(MEGA_FOLDER_NAME)[0]
+except IndexError:
+    mega_folder = m.create_folder(MEGA_FOLDER_NAME)
+
+
+# Determine the directory of the current script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Construct the path to the uploaded_files directory and database file
+FILES_DIR = os.path.join(os.path.dirname(current_dir), "uploaded_files")
+DB_FILE = os.path.join(FILES_DIR, "files.db")
 
 # Function to connect to the database
 def get_db_connection():
@@ -34,7 +50,8 @@ def setup_database():
             mime_type TEXT,
             timestamp TEXT,
             book_name TEXT,
-            book_grade TEXT
+            book_grade TEXT,
+            mega_url TEXT
         )
     """)
     conn.commit()
@@ -86,11 +103,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> dic
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         new_file_name = f"{user.id}_{timestamp}_{file_name}"
         new_file_path = os.path.join(FILES_DIR, new_file_name)
-
-        # Save the file to disk
-        with open(new_file_path, "wb") as f:
-            f.write(file_data)
-
+        
         if context.user_data.get("save_file"):
             del context.user_data["save_file"]
             # Ask the user for book info
@@ -101,7 +114,8 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> dic
                 "user_name": user.first_name,
                 "mime_type": mime_type,
                 "timestamp": timestamp,
-                "file_base64": file_base64
+                "file_base64": file_base64,
+                "file_data": file_data
             }
 
             reply_keyboard = [['الغاء']]
@@ -114,17 +128,23 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> dic
         
             return None
         else:
+            # Upload file to Mega and get the URL
+            
+            mega_file = m.upload(new_file_path, dest=mega_folder)
+            mega_url = m.get_upload_link(mega_file)
+
             uploaded_file = {
                 "mimeType": mime_type,
                 "data": file_base64,
-                "file_name": file_name
+                "file_name": file_name,
+                "mega_url": mega_url,
             }
             return uploaded_file
     except Exception as e:
         logger.error(f"Error processing file: {e}", exc_info=True)
         await update.message.reply_text("Error processing the file. Please try again later.")
         return None
-    
+        
 
 async def save_book_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     book_info = update.message.text
@@ -136,7 +156,10 @@ async def save_book_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pending_file = context.user_data.get("pending_file")
 
         if pending_file:
-
+            
+            
+            mega_file = m.upload(os.path.join(FILES_DIR, pending_file['stored_name']), dest=mega_folder)
+            mega_url = m.get_upload_link(mega_file)
             book_name = None
             book_grade = None
             if "كتاب" in book_info:
@@ -153,9 +176,9 @@ async def save_book_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO files (original_name, stored_name, user_id, user_name, mime_type, timestamp, book_name, book_grade)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (pending_file["original_name"], pending_file["stored_name"], pending_file["user_id"], pending_file["user_name"], pending_file["mime_type"], pending_file["timestamp"], book_name, book_grade))
+                INSERT INTO files (original_name, stored_name, user_id, user_name, mime_type, timestamp, book_name, book_grade, mega_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (pending_file["original_name"], pending_file["stored_name"], pending_file["user_id"], pending_file["user_name"], pending_file["mime_type"], pending_file["timestamp"], book_name, book_grade, mega_url))
             conn.commit()
             conn.close()
             del context.user_data["pending_file"]
@@ -195,5 +218,3 @@ async def send_long_message(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     for i in range(0, len(text), max_length):
         chunk = text[i:i + max_length]
         await update.message.reply_text(chunk)
-
- 
