@@ -1,1 +1,1 @@
-web: python telechat.py
+web: python bot.py

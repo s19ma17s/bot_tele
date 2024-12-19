@@ -1,13 +1,13 @@
 import logging
 import google.generativeai as genai
-import os
+
 from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     filters,
-    ContextTypes,
+
 )
 from threading import Thread
 from config import BOT_TOKEN, GOOGLE_API_KEY
