@@ -24,6 +24,7 @@ import traceback
 import datetime
 from redis.asyncio import Redis
 from concurrent.futures import ThreadPoolExecutor
+import logging
 
 # Configuration
 API_KEY = "AIzaSyBf243RgEB3k9YLQZy3MTEcqROHml9qEd4"
@@ -278,6 +279,9 @@ async def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL | filters.PHOTO | filters.REPLY, handle_message))
+    application = Application.builder().token(BOT_TOKEN).build()
+
+    app = application.webhooks() #هذه هي اضافة الكود الاساسية للتوافق مع ASGI
 
     # تشغيل البوت مع webhook
     await application.run_webhook(
@@ -288,9 +292,14 @@ async def main() -> None:
     )
 
 if __name__ == "__main__":
-    # استخدم uvicorn لتشغيل البوت إذا لزم الأمر للتطوير المحلي
-    import uvicorn
-    uvicorn.run("telechat1:main", host="0.0.0.0", port=5000, log_level="info", reload=True)
-    # هذا الجزء مخصص للتطوير المحلي، قم بالتعليق عليه عند النشر على Heroku
-
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    
+    else: # للنشر على Heroku
+         await application.run_webhook(
+           listen="0.0.0.0",
+           port=int(os.environ.get("PORT", 5000)),  # استخدام متغير بيئة للمنفذ
+           url_path=BOT_TOKEN,
+           webhook_url=f"{WEBHOOK_URL}{BOT_TOKEN}"
+       )
 
