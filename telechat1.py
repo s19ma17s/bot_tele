@@ -23,7 +23,7 @@ from telegram.constants import ChatAction
 import traceback
 import datetime
 import redis
-import aioredis
+from redis.asyncio import Redis
 from concurrent.futures import ThreadPoolExecutor
 
 # استبدل هذا بالمفتاح الفعلي لواجهة برمجة التطبيقات (API) الخاصة بك ورمز البوت
@@ -79,7 +79,7 @@ redis_pool = None
 
 async def redis_init():
     global redis_pool
-    redis_pool = aioredis.from_url(REDIS_URL, decode_responses=True)
+    redis_pool = await Redis.from_url(REDIS_URL, decode_responses=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
