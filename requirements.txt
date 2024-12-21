@@ -1,9 +1,9 @@
 python-dotenv
-python-telegram-bot
-google-generativeai
-httpx
-flask
-pillow
+
+
+
+
+
 
 python-telegram-bot==20.7
 google-generativeai
