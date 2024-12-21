@@ -1,1 +1,1 @@
-web: python telechat1.py
+web: python telechat.py
