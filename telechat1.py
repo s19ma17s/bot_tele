@@ -282,21 +282,13 @@ async def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL | filters.PHOTO | filters.REPLY, handle_message))
 
-    # Add handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL | filters.PHOTO | filters.REPLY, handle_message))
-
+    # Set webhook
+    await application.bot.set_webhook(url=f"{WEBHOOK_URL}{BOT_TOKEN}")
+    
+    # Return the application for uvicorn to use
     return application
 
-async def run():
-    application = await main()
-    await application.bot.set_webhook(url=f"{WEBHOOK_URL}{BOT_TOKEN}")
-
-    # Pass the application to uvicorn
-    config = uvicorn.Config(application, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), log_level="info")
-    server = uvicorn.Server(config)
-    await server.serve()
-
 if __name__ == "__main__":
-    asyncio.run(run())
+    # Create and run the uvicorn server
+    app = asyncio.run(main())
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
