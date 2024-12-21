@@ -261,13 +261,20 @@ async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 
 async def send_data_to_api(data, uploaded_file, update):
     try:
+        # نتحقق إذا كان لدينا عنوان API حقيقي
+        api_url = os.getenv('API_ENDPOINT', None)
+        
+        # إذا لم يكن هناك عنوان API، نرجع None بدون محاولة الاتصال
+        if not api_url:
+            return None
+            
         files = {}
         if uploaded_file:
              file_data = base64.b64decode(uploaded_file["data"])
              files["file"] = (uploaded_file.get("file_name", "file"), io.BytesIO(file_data), uploaded_file["mimeType"])
         
         async with httpx.AsyncClient() as client:
-            response = await client.post('http://127.0.0.1:5000/your-api-endpoint', 
+            response = await client.post(api_url, 
                                        data=data, 
                                        files=files, 
                                        timeout=10)
@@ -277,11 +284,11 @@ async def send_data_to_api(data, uploaded_file, update):
                 return response.json().get("message")
             return None
     except httpx.HTTPError as e:
-        logger.error(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. خطأ HTTP: {e}", exc_info=True)
-        return f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. خطأ HTTP: {e}"
+        logger.warning(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. خطأ HTTP: {e}")
+        return None  # نرجع None بدلاً من رسالة الخطأ
     except Exception as e:
-        logger.error(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. حدث خطأ: {e}", exc_info=True)
-        return f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. حدث خطأ: {e}"
+        logger.warning(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. حدث خطأ: {e}")
+        return None  # نرجع None بدلاً من رسالة الخطأ
 
 async def webhook_handler(request):
     """دالة معالجة Webhook"""
