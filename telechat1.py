@@ -295,11 +295,11 @@ if __name__ == "__main__":
         import uvicorn
         uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
     
-    else: # للنشر على Heroku
-         await application.run_webhook(
-           listen="0.0.0.0",
-           port=int(os.environ.get("PORT", 5000)),  # استخدام متغير بيئة للمنفذ
-           url_path=BOT_TOKEN,
-           webhook_url=f"{WEBHOOK_URL}{BOT_TOKEN}"
-       )
+else: # للنشر على Heroku
+    await application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),  # استخدام متغير بيئة للمنفذ
+        url_path=BOT_TOKEN,
+        webhook_url=f"{WEBHOOK_URL}{BOT_TOKEN}"
+)
 
