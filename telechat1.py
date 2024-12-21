@@ -22,11 +22,15 @@ import asyncio
 from telegram.constants import ChatAction
 import traceback
 import datetime
+import redis
+import aioredis
+from concurrent.futures import ThreadPoolExecutor
 
 # استبدل هذا بالمفتاح الفعلي لواجهة برمجة التطبيقات (API) الخاصة بك ورمز البوت
 API_KEY = "AIzaSyBf243RgEB3k9YLQZy3MTEcqROHml9qEd4"  # استبدل بمفتاح واجهة برمجة التطبيقات الخاص بك من جوجل
 BOT_TOKEN = "7728767686:AAG6_DBhD-3Mj4wRzJCp9CUNWzLuRhq-mXE"  # استبدل برمز البوت الخاص بك من تيليجرام
 WEBHOOK_URL = "https://bottom-vivianne-s19ma10s-95ea14ea.koyeb.app/"  # استبدل بعنوان URL الخاص بك
+REDIS_URL = "redis://localhost:6379/0"  # استبدل بعنوان URL الخاص بك ل Redis
 
 # تهيئة التسجيل (Logging)
 logging.basicConfig(
@@ -69,6 +73,13 @@ system_instructions = """
 اتكلم باللهجة المصرية ديما في البداية كلغة افتراضية قبل اي حاجه لغايت محد يطلب منك عكس كدا طول محد مطلبش اتكلم بالمصرية
 حاول متقلش يعم الحج خالص
 """
+
+# تهيئة طابور Redis
+redis_pool = None
+
+async def redis_init():
+    global redis_pool
+    redis_pool = aioredis.from_url(REDIS_URL, decode_responses=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
@@ -125,7 +136,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
              uploaded_file = await handle_photo(update, context)
 
         if user_input or uploaded_file:
-           await process_message(update, context, user_input=user_input, uploaded_file=uploaded_file, user_id=user.id, user_name=user.first_name, chat_id=update.message.chat.id, chat_type=chat.type, chat_title=chat.title if chat.type != "private" else None)
+            asyncio.create_task(process_message_queue(update, context, user_input=user_input, uploaded_file=uploaded_file, user_id=user.id, user_name=user.first_name, chat_id=update.message.chat.id, chat_type=chat.type, chat_title=chat.title if chat.type != "private" else None))
     except Exception as e:
          logger.error(f"حدث خطأ في معالجة الرسالة: {e}", exc_info=True)
          await update.message.reply_text("حدث خطأ. يرجى المحاولة مرة أخرى لاحقًا.")
@@ -201,7 +212,53 @@ async def send_long_message(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         chunk = text[i:i + max_length]
         await update.message.reply_text(chunk)
 
-async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE, user_input=None, uploaded_file=None, chat_id=None, user_id=None, user_name=None, chat_type=None, chat_title=None):
+
+async def process_message_queue(update: Update, context: ContextTypes.DEFAULT_TYPE, user_input=None, uploaded_file=None, chat_id=None, user_id=None, user_name=None, chat_type=None, chat_title=None):
+    try:
+        message_data = {
+            "user_input": user_input,
+            "uploaded_file": uploaded_file,
+            "chat_id": chat_id,
+            "user_id": user_id,
+            "user_name": user_name,
+            "chat_type": chat_type,
+            "chat_title": chat_title,
+            "update_id": update.update_id
+        }
+        await redis_pool.rpush("message_queue", json.dumps(message_data))
+        
+        await update.message.reply_text("جاري معالجة رسالتك...")
+    except Exception as e:
+        logger.error(f"حدث خطأ في إضافة الرسالة إلى الطابور: {e}", exc_info=True)
+        await update.message.reply_text("حدث خطأ في معالجة رسالتك.")
+
+async def process_message_from_queue():
+    while True:
+        try:
+            _, data = await redis_pool.blpop("message_queue")
+            message_data = json.loads(data)
+            
+            update_id = message_data.get("update_id")
+            update = await application.get_updates(offset=update_id, limit=1)
+            if not update:
+              continue
+            update = update[0]
+            
+            user_input = message_data.get("user_input")
+            uploaded_file = message_data.get("uploaded_file")
+            chat_id = message_data.get("chat_id")
+            user_id = message_data.get("user_id")
+            user_name = message_data.get("user_name")
+            chat_type = message_data.get("chat_type")
+            chat_title = message_data.get("chat_title")
+            
+            await process_message(update, user_input=user_input, uploaded_file=uploaded_file, chat_id=chat_id, user_id=user_id, user_name=user_name, chat_type=chat_type, chat_title=chat_title)
+            
+        except Exception as e:
+            logger.error(f"حدث خطأ في معالجة الرسالة من الطابور: {e}", exc_info=True)
+        await asyncio.sleep(0.1)
+        
+async def process_message(update: Update, user_input=None, uploaded_file=None, chat_id=None, user_id=None, user_name=None, chat_type=None, chat_title=None):
     try:
         chat_session = await get_or_create_chat_session(update, context)
         user = update.message.from_user
@@ -259,6 +316,7 @@ async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE, us
         if "update" in locals() and hasattr(update, 'message'):
            await update.message.reply_text("حدث خطأ. يرجى المحاولة مرة أخرى لاحقًا.")
 
+
 async def send_data_to_api(data, uploaded_file, update):
     try:
         # نتحقق إذا كان لدينا عنوان API حقيقي
@@ -303,14 +361,21 @@ async def webhook_handler(request):
         logger.error(f"خطأ في معالجة Webhook: {e}", exc_info=True)
         return "خطأ داخلي", 500
 
-def main() -> None:
+async def main() -> None:
+    # تهيئة Redis
+    await redis_init()
+    
     # إنشاء التطبيق
     application = Application.builder().token(BOT_TOKEN).build()
-
+    global context
+    context = application.context
     # إضافة معالجات الأوامر والرسائل
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL | filters.PHOTO | filters.REPLY, handle_message))
+    
+    # تشغيل معالج الرسائل من الطابور في الخلفية
+    asyncio.create_task(process_message_from_queue())
     
     # تشغيل البوت مع webhook
     application.run_webhook(
@@ -321,4 +386,4 @@ def main() -> None:
     )
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
