@@ -267,4 +267,51 @@ async def send_data_to_api(data, uploaded_file, update):
              files["file"] = (uploaded_file.get("file_name", "file"), io.BytesIO(file_data), uploaded_file["mimeType"])
         
         async with httpx.AsyncClient() as client:
-            response = await client.post('http://127.0.0.1:5000/your-api-endpoint', data=data
+            response = await client.post('http://127.0.0.1:5000/your-api-endpoint', 
+                                       data=data, 
+                                       files=files, 
+                                       timeout=10)
+            response.raise_for_status()
+            logger.info(f"تم إرسال البيانات إلى واجهة برمجة التطبيقات بنجاح. الرد: {response.status_code}")
+            if response.headers.get("Content-Type") == "application/json":
+                return response.json().get("message")
+            return None
+    except httpx.HTTPError as e:
+        logger.error(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. خطأ HTTP: {e}", exc_info=True)
+        return f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. خطأ HTTP: {e}"
+    except Exception as e:
+        logger.error(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. حدث خطأ: {e}", exc_info=True)
+        return f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. حدث خطأ: {e}"
+
+async def webhook_handler(request):
+    """دالة معالجة Webhook"""
+    try:
+        data = await request.get_json()
+        logger.info(f"تم استلام البيانات من تيليجرام: {data}")
+        update = Update.de_json(data, application.bot)
+        await application.process_update(update)
+        return "OK", 200
+
+    except Exception as e:
+        logger.error(f"خطأ في معالجة Webhook: {e}", exc_info=True)
+        return "خطأ داخلي", 500
+
+def main() -> None:
+    # إنشاء التطبيق
+    application = Application.builder().token(BOT_TOKEN).build()
+
+    # إضافة معالجات الأوامر والرسائل
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL | filters.PHOTO | filters.REPLY, handle_message))
+    
+    # تشغيل البوت مع webhook
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=5000,
+        url_path=BOT_TOKEN,
+        webhook_url=f"{WEBHOOK_URL}{BOT_TOKEN}"
+    )
+
+if __name__ == "__main__":
+    main()
