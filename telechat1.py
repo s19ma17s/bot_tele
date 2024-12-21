@@ -270,38 +270,33 @@ async def send_data_to_api(data, uploaded_file, update):
         logger.warning(f"فشل إرسال البيانات إلى واجهة برمجة التطبيقات. حدث خطأ: {e}")
         return None
 
-async def main() -> None:
-    # تهيئة Redis
+async def main():
+    # Initialize Redis
     await redis_init()
-
-    # إنشاء التطبيق
+    
+    # Initialize application
     application = Application.builder().token(BOT_TOKEN).build()
 
-    # إضافة معالجات الأوامر والرسائل
+    # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL | filters.PHOTO | filters.REPLY, handle_message))
-    application = Application.builder().token(BOT_TOKEN).build()
 
-    app = application.webhooks() #هذه هي اضافة الكود الاساسية للتوافق مع ASGI
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL | filters.PHOTO | filters.REPLY, handle_message))
 
-    # تشغيل البوت مع webhook
-    await application.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000)),  # استخدام متغير بيئة للمنفذ
-        url_path=BOT_TOKEN,
-        webhook_url=f"{WEBHOOK_URL}{BOT_TOKEN}"
-    )
+    return application
+
+async def run():
+    application = await main()
+    await application.bot.set_webhook(url=f"{WEBHOOK_URL}{BOT_TOKEN}")
+
+    # Pass the application to uvicorn
+    config = uvicorn.Config(application, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
 
 if __name__ == "__main__":
-        
-        uvicorn.run("telechat1:main", host="0.0.0.0", port=8000, log_level="info")
-    
-else: # للنشر على Heroku
-    await application.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000)),  # استخدام متغير بيئة للمنفذ
-        url_path=BOT_TOKEN,
-        webhook_url=f"{WEBHOOK_URL}{BOT_TOKEN}"
-)
-
+    asyncio.run(run())
