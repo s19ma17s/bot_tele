@@ -25,6 +25,8 @@ import datetime
 from redis.asyncio import Redis
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import uvicorn
+import os
 
 # Configuration
 API_KEY = "AIzaSyBf243RgEB3k9YLQZy3MTEcqROHml9qEd4"
@@ -292,8 +294,8 @@ async def main() -> None:
     )
 
 if __name__ == "__main__":
-        import uvicorn
-        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+        
+        uvicorn.run("telechat1:main", host="0.0.0.0", port=8000, log_level="info")
     
 else: # للنشر على Heroku
     await application.run_webhook(
