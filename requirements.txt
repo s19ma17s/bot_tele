@@ -4,3 +4,9 @@ google-generativeai
 httpx
 flask
 pillow
+
+python-telegram-bot==20.7
+google-generativeai
+Pillow
+httpx
+flask
