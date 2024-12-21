@@ -29,10 +29,25 @@ import uvicorn
 import os
 
 # Configuration
-API_KEY = "AIzaSyBf243RgEB3k9YLQZy3MTEcqROHml9qEd4"
-BOT_TOKEN = "7728767686:AAG6_DBhD-3Mj4wRzJCp9CUNWzLuRhq-mXE"
-WEBHOOK_URL = "https://bottom-vivianne-s19ma10s-95ea14ea.koyeb.app/"
+API_KEY = os.getenv('API_KEY')
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+WEBHOOK_URL = os.getenv('WEBHOOK_URL')
 REDIS_URL = "redis://localhost:6379/0"
+
+if not API_KEY:
+    logger.error("مفتاح واجهة برمجة تطبيقات جوجل (API_KEY) مفقود في متغيرات البيئة.")
+    print("مفتاح واجهة برمجة تطبيقات جوجل (API_KEY) مفقود. يرجى التأكد من تعيينه.")
+    exit()
+
+if not BOT_TOKEN:
+    logger.error("رمز بوت التليجرام (BOT_TOKEN) مفقود في متغيرات البيئة.")
+    print("رمز بوت التليجرام (BOT_TOKEN) مفقود. يرجى التأكد من تعيينه.")
+    exit()
+
+if not WEBHOOK_URL:
+    logger.error("عنوان الويب هوك (WEBHOOK_URL) مفقود في متغيرات البيئة.")
+    print("عنوان الويب هوك (WEBHOOK_URL) مفقود. يرجى التأكد من تعيينه.")
+    exit()
 
 # Logging setup
 logging.basicConfig(
@@ -282,11 +297,16 @@ async def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL | filters.PHOTO | filters.REPLY, handle_message))
 
+    # Create FastAPI app
+    app = FastAPI()
+    
     # Set webhook
     await application.bot.set_webhook(url=f"{WEBHOOK_URL}{BOT_TOKEN}")
     
-    # Return the application for uvicorn to use
-    return application
+    # Add webhook route
+    app.include_router(application.create_webhook_router(path=f"/{BOT_TOKEN}"))
+    
+    return app
 
 if __name__ == "__main__":
     # Create and run the uvicorn server
