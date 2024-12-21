@@ -4,7 +4,7 @@ python-dotenv
 
 
 redis
-aioredis
+
 
 
 python-telegram-bot==20.7
