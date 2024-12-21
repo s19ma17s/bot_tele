@@ -13,6 +13,8 @@ from telegram.ext import (
     filters,
     ContextTypes,
     CallbackQueryHandler,
+    CallbackContext,
+    Dispatcher,
 )
 import httpx
 import json
@@ -20,15 +22,13 @@ from threading import Thread
 import asyncio
 from telegram.constants import ChatAction
 import traceback
-from telegram.ext import CallbackContext
-from telegram.ext.dispatcher import Dispatcher
 from flask import Flask, request, jsonify
 import datetime
 
 # استبدل هذا بالمفتاح الفعلي لواجهة برمجة التطبيقات (API) الخاصة بك ورمز البوت
 API_KEY = "AIzaSyBf243RgEB3k9YLQZy3MTEcqROHml9qEd4"  # استبدل بمفتاح واجهة برمجة التطبيقات الخاص بك من جوجل
 BOT_TOKEN = "7728767686:AAG6_DBhD-3Mj4wRzJCp9CUNWzLuRhq-mXE"  # استبدل برمز البوت الخاص بك من تيليجرام
-WEBHOOK_URL = "your_webhook_url" # استبدل بعنوان URL الخاص بك
+WEBHOOK_URL = "https://bottom-vivianne-s19ma10s-95ea14ea.koyeb.app/"  # استبدل بعنوان URL الخاص بك
 
 # تهيئة التسجيل (Logging)
 logging.basicConfig(
